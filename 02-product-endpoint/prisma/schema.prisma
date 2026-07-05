@@ -1,7 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
   provider = "prisma-client"
@@ -12,11 +8,11 @@ datasource db {
   provider = "postgresql"
 }
 
-model Research {
-  id             Int     @id @default(autoincrement())
-  jobTitle       String
-  level          String
-  industry       String
-  additionalInfo String?
-  isDone         Boolean @default(false)
+model CustomerResearch {
+  id              Int     @id @default(autoincrement())
+  targetMarket    String
+  industry        String
+  location        String? @default("Indonesia")
+  additionalInfo  String?
+  isDone          Boolean @default(false)
 }

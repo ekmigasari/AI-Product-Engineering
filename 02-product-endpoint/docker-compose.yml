@@ -1,15 +1,15 @@
 services:
   postgres:
     image: postgres:16
-    container_name: aiproduct
+    container_name: aiproductdb
     environment:
-      POSTGRES_USER: aiproduct
-      POSTGRES_PASSWORD: aiproduct
-      POSTGRES_DB: aiproduct
+      POSTGRES_USER: aiproductdb
+      POSTGRES_PASSWORD: aiproductdb
+      POSTGRES_DB: aiproductdb
     ports:
-      - "65432:5432"
+      - "5432:5432"
     volumes:
-      - aiproduct:/var/lib/postgresql/data
+      - aiproductdb:/var/lib/postgresql/data
 
 volumes:
   aiproduct:

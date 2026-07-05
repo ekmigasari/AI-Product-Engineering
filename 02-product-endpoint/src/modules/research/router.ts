@@ -1,31 +1,33 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { ResearchRequestSchema } from "./schema.js";
+import { CustomerResearchRequestSchema } from "./schema.js";
 import { aiResearchQueue } from "../../utils/queue.js";
 import { prisma } from "../../utils/prisma.js";
 
 export const researchRouter = new Hono()
   .get("/", async (c) => {
-    const researchs = await prisma.research.findMany();
-    return c.json(researchs);
+    const customerResearches = await prisma.customerResearch.findMany();
+    return c.json(customerResearches);
   })
-  .post("/", zValidator("json", ResearchRequestSchema), async (c) => {
+  .post("/", zValidator("json", CustomerResearchRequestSchema), async (c) => {
     const body = c.req.valid("json");
-    const { jobTitle, level, industry, additionalInfo } = body;
+    const { targetMarket, industry, location, additionalInfo } = body;
 
-    const newResearch = await prisma.research.create({
+    const newCustomerResearch = await prisma.customerResearch.create({
       data: {
-        jobTitle,
-        level,
+        targetMarket,
         industry,
+        location,
         additionalInfo,
       },
     });
 
-    await aiResearchQueue.add("research", newResearch);
+    console.log("ROUTER: input data saved to database");
+
+    await aiResearchQueue.add("customerResearch", newCustomerResearch);
 
     return c.json({
-      message: "Research is on queue",
-      researchId: newResearch.id,
+      message: "ROUTER: Customer  Research is on queue",
+      customerResearchId: newCustomerResearch.id,
     });
   });

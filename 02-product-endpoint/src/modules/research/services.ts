@@ -5,14 +5,15 @@ export async function generatePerspective(
   context: string,
   instructions: string,
 ) {
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
+  const AI_API_KEY = process.env.AI_API_KEY as string;
+  const AI_BASE_URL = process.env.AI_BASE_URL as string;
 
-  const client = getClient({ apiKey: OPENAI_API_KEY });
-  const model = client.completionModel("gemini/gemini-3.5-flash");
+  const client = getClient({ apiKey: AI_API_KEY, baseUrl: AI_BASE_URL });
+  const model = client.completionModel("glm-5.2");
   const response = await createCompletion(model, {
     instructions,
     input: context,
-    maxTokens: 3000,
+    maxTokens: 800,
   });
 
   return response.text;

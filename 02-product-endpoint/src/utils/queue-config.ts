@@ -1,6 +1,6 @@
 import type { ConnectionOptions } from "bullmq";
 
-export const AIRESEARCH_QUEUE_NAME = "ai-research";
+export const AIRESEARCH_QUEUE_NAME = "customer-insight-research";
 
 export const connection: ConnectionOptions = {
   host: process.env.REDIS_HOST || "localhost",

@@ -1,0 +1,13 @@
+### GET all research
+GET http://localhost:8000/research
+
+### POST customer insight research
+POST http://localhost:8000/research
+Content-Type: application/json
+
+{
+  "targetMarket": "Casual Runners",
+  "industry": "Sportswear",
+  "location": "Indonesia",
+  "additionalInfo": "I want to know the customer insights of Casual Runners in Sportswear industry in Indonesia, I will use the result to create a product for them."
+}

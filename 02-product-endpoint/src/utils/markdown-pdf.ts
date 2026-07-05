@@ -2,11 +2,20 @@ import { createWriteStream } from "node:fs";
 import { lexer, type Token, type Tokens } from "marked";
 import PDFDocument from "pdfkit";
 
-const PDF_MARGIN = 56;
-const BODY_FONT_SIZE = 11;
+const PDF_MARGIN = 38;
+const BODY_FONT_SIZE = 9.5;
 const BODY_COLOR = "#111827";
 const MUTED_COLOR = "#6b7280";
 const BORDER_COLOR = "#d1d5db";
+const LINE_GAP = 1.6;
+const PARAGRAPH_GAP = 4;
+const SECTION_GAP = 6;
+const FOOTER_HEIGHT = 22;
+
+type TextStyle = {
+  font: string;
+  color: string;
+};
 
 export function writeMarkdownPdf(markdown: string, filePath: string) {
   return new Promise<void>((resolve, reject) => {
@@ -32,7 +41,7 @@ export function writeMarkdownPdf(markdown: string, filePath: string) {
     doc.on("error", reject);
 
     doc.pipe(stream);
-    renderMarkdownTokens(doc, lexer(markdown));
+    renderMarkdownTokens(doc, lexer(normalizeMarkdown(markdown)));
     addPageNumbers(doc);
     doc.end();
   });
@@ -42,23 +51,24 @@ function renderMarkdownTokens(
   doc: PDFKit.PDFDocument,
   tokens: Token[],
   indent = 0,
+  style: TextStyle = { font: "Helvetica", color: BODY_COLOR },
 ) {
   for (const token of tokens) {
     switch (token.type) {
       case "space":
-        doc.moveDown(0.4);
+        addGap(doc, 3);
         break;
       case "heading":
         renderHeading(doc, token as Tokens.Heading, indent);
         break;
       case "paragraph":
-        renderParagraph(doc, inlineText(token.tokens, token.text), indent);
+        renderParagraph(doc, inlineText(token.tokens, token.text), indent, style);
         break;
       case "text":
-        renderParagraph(doc, inlineText(token.tokens, token.text), indent);
+        renderParagraph(doc, inlineText(token.tokens, token.text), indent, style);
         break;
       case "list":
-        renderList(doc, token as Tokens.List, indent);
+        renderList(doc, token as Tokens.List, indent, style);
         break;
       case "blockquote":
         renderBlockquote(doc, token as Tokens.Blockquote, indent);
@@ -73,11 +83,11 @@ function renderMarkdownTokens(
         renderTable(doc, token as Tokens.Table, indent);
         break;
       case "html":
-        renderParagraph(doc, stripHtml(token.text), indent);
+        renderParagraph(doc, stripHtml(token.text), indent, style);
         break;
       default:
         if ("tokens" in token && Array.isArray(token.tokens)) {
-          renderMarkdownTokens(doc, token.tokens, indent);
+          renderMarkdownTokens(doc, token.tokens, indent, style);
         }
         break;
     }
@@ -90,23 +100,30 @@ function renderHeading(
   indent: number,
 ) {
   const fontSize = headingFontSize(token.depth);
-  ensureSpace(doc, fontSize * 2);
+  const text = inlineText(token.tokens, token.text);
+  const height = measureText(doc, text, "Helvetica-Bold", fontSize, indent, 2);
+  ensureSpace(doc, height + SECTION_GAP * 2);
+
+  if (!isAtPageTop(doc)) {
+    addGap(doc, token.depth === 1 ? 8 : 5);
+  }
+
   doc
-    .moveDown(token.depth === 1 ? 0.7 : 0.45)
     .font("Helvetica-Bold")
     .fontSize(fontSize)
     .fillColor(BODY_COLOR)
-    .text(inlineText(token.tokens, token.text), textX(doc, indent), doc.y, {
+    .text(text, textX(doc, indent), doc.y, {
       width: textWidth(doc, indent),
       lineGap: 2,
     });
-  doc.moveDown(0.35);
+  addGap(doc, token.depth === 1 ? 5 : 3);
 }
 
 function renderParagraph(
   doc: PDFKit.PDFDocument,
   text: string,
   indent: number,
+  style: TextStyle,
 ) {
   const value = text.trim();
 
@@ -114,21 +131,32 @@ function renderParagraph(
     return;
   }
 
+  const height = measureText(
+    doc,
+    value,
+    style.font,
+    BODY_FONT_SIZE,
+    indent,
+    LINE_GAP,
+  );
+  ensureSpace(doc, height + PARAGRAPH_GAP);
+
   doc
-    .font("Helvetica")
+    .font(style.font)
     .fontSize(BODY_FONT_SIZE)
-    .fillColor(BODY_COLOR)
+    .fillColor(style.color)
     .text(value, textX(doc, indent), doc.y, {
       width: textWidth(doc, indent),
-      lineGap: 4,
+      lineGap: LINE_GAP,
     });
-  doc.moveDown(0.65);
+  addGap(doc, PARAGRAPH_GAP);
 }
 
 function renderList(
   doc: PDFKit.PDFDocument,
   token: Tokens.List,
   indent: number,
+  style: TextStyle,
 ) {
   const startNumber = typeof token.start === "number" ? token.start : 1;
 
@@ -149,32 +177,48 @@ function renderList(
           ? "[x]"
           : "[ ]"
         : "-";
-    const labelWidth = 24;
+    const labelWidth = token.ordered ? 28 : 18;
+    const itemIndent = indent + labelWidth;
+    const itemText = firstLine.trim();
+    const height = measureText(
+      doc,
+      itemText,
+      style.font,
+      BODY_FONT_SIZE,
+      itemIndent,
+      LINE_GAP,
+    );
+
+    ensureSpace(doc, height + 4);
     const y = doc.y;
 
-    ensureSpace(doc, BODY_FONT_SIZE * 2);
     doc
-      .font("Helvetica")
+      .font(style.font)
       .fontSize(BODY_FONT_SIZE)
-      .fillColor(BODY_COLOR)
+      .fillColor(style.color)
       .text(label, textX(doc, indent), y, { width: labelWidth });
 
-    doc
-      .font("Helvetica")
-      .fontSize(BODY_FONT_SIZE)
-      .fillColor(BODY_COLOR)
-      .text(firstLine.trim(), textX(doc, indent + labelWidth), y, {
-        width: textWidth(doc, indent + labelWidth),
-        lineGap: 4,
-      });
-    doc.moveDown(0.35);
+    if (itemText) {
+      doc
+        .font(style.font)
+        .fontSize(BODY_FONT_SIZE)
+        .fillColor(style.color)
+        .text(itemText, textX(doc, itemIndent), y, {
+          width: textWidth(doc, itemIndent),
+          lineGap: LINE_GAP,
+        });
+    } else {
+      doc.y = y + BODY_FONT_SIZE + LINE_GAP;
+    }
+
+    addGap(doc, 2);
 
     if (remainingTokens.length > 0) {
-      renderMarkdownTokens(doc, remainingTokens, indent + labelWidth);
+      renderMarkdownTokens(doc, remainingTokens, itemIndent, style);
     }
   });
 
-  doc.moveDown(0.35);
+  addGap(doc, 2);
 }
 
 function renderBlockquote(
@@ -184,18 +228,21 @@ function renderBlockquote(
 ) {
   const quoteIndent = indent + 16;
 
-  ensureSpace(doc, BODY_FONT_SIZE * 3);
+  ensureSpace(doc, BODY_FONT_SIZE * 2);
+  const y = doc.y;
   doc
     .save()
     .strokeColor(BORDER_COLOR)
     .lineWidth(2)
-    .moveTo(textX(doc, indent), doc.y)
-    .lineTo(textX(doc, indent), doc.y + BODY_FONT_SIZE * 3)
+    .moveTo(textX(doc, indent), y)
+    .lineTo(textX(doc, indent), y + BODY_FONT_SIZE * 2)
     .stroke()
     .restore();
 
-  doc.font("Helvetica-Oblique").fillColor(MUTED_COLOR);
-  renderMarkdownTokens(doc, token.tokens, quoteIndent);
+  renderMarkdownTokens(doc, token.tokens, quoteIndent, {
+    font: "Helvetica-Oblique",
+    color: MUTED_COLOR,
+  });
   doc.fillColor(BODY_COLOR).font("Helvetica");
 }
 
@@ -205,10 +252,10 @@ function renderCodeBlock(
   indent: number,
 ) {
   const width = textWidth(doc, indent);
-  const text = token.text.trimEnd();
+  const text = token.text.trimEnd() || " ";
 
   doc.font("Courier").fontSize(9);
-  const height = doc.heightOfString(text, { width, lineGap: 3 }) + 18;
+  const height = doc.heightOfString(text, { width: width - 16, lineGap: 2 }) + 14;
   ensureSpace(doc, height);
 
   const x = textX(doc, indent);
@@ -223,8 +270,8 @@ function renderCodeBlock(
     .font("Courier")
     .fontSize(9)
     .fillColor(BODY_COLOR)
-    .text(text, x + 9, y + 9, { width: width - 18, lineGap: 3 });
-  doc.y = y + height + 8;
+    .text(text, x + 8, y + 7, { width: width - 16, lineGap: 2 });
+  doc.y = y + height + PARAGRAPH_GAP;
 }
 
 function renderRule(doc: PDFKit.PDFDocument, indent: number) {
@@ -238,7 +285,7 @@ function renderRule(doc: PDFKit.PDFDocument, indent: number) {
     .lineTo(x + textWidth(doc, indent), doc.y + 8)
     .stroke()
     .restore();
-  doc.moveDown(1.2);
+  doc.y += 18;
 }
 
 function renderTable(
@@ -246,21 +293,72 @@ function renderTable(
   token: Tokens.Table,
   indent: number,
 ) {
-  const rows = [token.header, ...token.rows]
-    .map((row) =>
-      row.map((cell) => inlineText(cell.tokens, cell.text)).join(" | "),
-    )
-    .join("\n");
-
-  renderCodeBlock(
-    doc,
-    {
-      type: "code",
-      raw: token.raw,
-      text: rows,
-    },
-    indent,
+  const rows = [token.header, ...token.rows].map((row) =>
+    row.map((cell) => inlineText(cell.tokens, cell.text).trim()),
   );
+
+  if (rows.length === 0 || rows[0].length === 0) {
+    return;
+  }
+
+  const x = textX(doc, indent);
+  const width = textWidth(doc, indent);
+  const columnCount = rows[0].length;
+  const columnWidth = width / columnCount;
+  const paddingX = 5;
+  const paddingY = 4;
+
+  rows.forEach((row, rowIndex) => {
+    const isHeader = rowIndex === 0;
+    const rowHeight =
+      Math.max(
+        ...row.map((cell) =>
+          measureRawText(
+            doc,
+            cell || " ",
+            isHeader ? "Helvetica-Bold" : "Helvetica",
+            8.4,
+            columnWidth - paddingX * 2,
+            1.2,
+          ),
+        ),
+      ) +
+      paddingY * 2;
+
+    ensureSpace(doc, rowHeight);
+    const y = doc.y;
+
+    doc
+      .save()
+      .rect(x, y, width, rowHeight)
+      .fill(isHeader ? "#f3f4f6" : "#ffffff")
+      .restore();
+
+    row.forEach((cell, cellIndex) => {
+      const cellX = x + cellIndex * columnWidth;
+
+      doc
+        .save()
+        .strokeColor(BORDER_COLOR)
+        .lineWidth(0.5)
+        .rect(cellX, y, columnWidth, rowHeight)
+        .stroke()
+        .restore();
+
+      doc
+        .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(8.4)
+        .fillColor(BODY_COLOR)
+        .text(cell || " ", cellX + paddingX, y + paddingY, {
+          width: columnWidth - paddingX * 2,
+          lineGap: 1.2,
+        });
+    });
+
+    doc.y = y + rowHeight;
+  });
+
+  addGap(doc, PARAGRAPH_GAP + 1);
 }
 
 function addPageNumbers(doc: PDFKit.PDFDocument) {
@@ -332,6 +430,14 @@ function stripHtml(value: string) {
   return value.replaceAll(/<[^>]*>/g, "").trim();
 }
 
+function normalizeMarkdown(markdown: string) {
+  return markdown
+    .replaceAll(/\r\n?/g, "\n")
+    .replaceAll(/[\t ]+\n/g, "\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function headingFontSize(depth: number) {
   if (depth === 1) {
     return 22;
@@ -349,9 +455,48 @@ function headingFontSize(depth: number) {
 }
 
 function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
-  if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+  const bottom = usableBottom(doc);
+
+  if (!isAtPageTop(doc) && doc.y + height > bottom) {
     doc.addPage();
   }
+}
+
+function addGap(doc: PDFKit.PDFDocument, gap: number) {
+  if (doc.y + gap <= usableBottom(doc)) {
+    doc.y += gap;
+  }
+}
+
+function isAtPageTop(doc: PDFKit.PDFDocument) {
+  return doc.y <= doc.page.margins.top + 6;
+}
+
+function usableBottom(doc: PDFKit.PDFDocument) {
+  return doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT;
+}
+
+function measureText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  font: string,
+  size: number,
+  indent: number,
+  lineGap: number,
+) {
+  return measureRawText(doc, text, font, size, textWidth(doc, indent), lineGap);
+}
+
+function measureRawText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  font: string,
+  size: number,
+  width: number,
+  lineGap: number,
+) {
+  doc.font(font).fontSize(size);
+  return doc.heightOfString(text || " ", { width, lineGap });
 }
 
 function textX(doc: PDFKit.PDFDocument, indent: number) {

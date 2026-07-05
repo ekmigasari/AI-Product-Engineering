@@ -1,12 +1,16 @@
 {
-  "name": "product-endpoint",
+  "name": "02-product-endpoint",
   "type": "module",
   "scripts": {
-    "dev": "pnpm with-env tsx watch src/index.ts",
+    "dev": "pnpm with-env tsx watch src/index.ts & pnpm with-env tsx watch src/worker.ts",
+    "api:dev": "pnpm with-env tsx watch src/index.ts",
     "worker:dev": "pnpm with-env tsx watch src/worker.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "with-env": "dotenv -e ./.env --"
+    "with-env": "dotenv -e ./.env --",
+    "db:generate": "pnpm with-env prisma generate",
+    "db:migrate": "pnpm with-env prisma migrate dev",
+    "db:studio": "pnpm with-env prisma studio"
   },
   "dependencies": {
     "@anvia/core": "^0.8.0",
