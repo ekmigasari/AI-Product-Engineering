@@ -1,0 +1,4 @@
+- Full Fledge Monorepo FE
+- AI Layer, Data Layer, Presentation Layer
+- Agentic Workflow
+- 1 Chat Streaming
