@@ -15,4 +15,5 @@ model CustomerResearch {
   location        String? @default("Indonesia")
   additionalInfo  String?
   isDone          Boolean @default(false)
+  perspective     String?
 }
