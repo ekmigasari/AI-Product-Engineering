@@ -1,0 +1,37 @@
+{
+  "name": "monorepo-app",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "pnpm concurrently --names api,frontend,worker --kill-others 'pnpm --filter api dev' 'pnpm --filter frontend dev' 'pnpm --filter api worker:dev'",
+    "worker:dev": "pnpm run --filter=api worker:dev",
+    "build": "pnpm --filter './apps/*' build",
+    "with-env": "dotenv -e .env --",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:deploy": "pnpm --filter api db:deploy",
+    "db:push": "pnpm --filter api db:push",
+    "db:studio": "pnpm --filter api db:studio"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.9.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.3",
+    "dotenv-cli": "^11.0.0"
+  }
+}

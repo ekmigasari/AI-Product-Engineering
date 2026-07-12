@@ -1,0 +1,18 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model CustomerResearch {
+  id              Int     @id @default(autoincrement())
+  targetMarket    String
+  industry        String
+  location        String? @default("Indonesia")
+  additionalInfo  String?
+  isDone          Boolean @default(false)
+}
